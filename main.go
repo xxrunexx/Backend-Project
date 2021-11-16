@@ -1,28 +1,28 @@
 package main
 
 import (
-	"github.com/labstack/echo"
+	"net/http"
+	"strconv"
+
+	// "github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 type Account struct {
 	gorm.Model
-	username string `json: "username" gorm: "username"`
-	password string `json: "password" gorm: "password"`
-	email    string `json: "email" gorm: "email"`
-}
-
-var data = []Account{
-	{gorm.Model{}, "haarunrasyid", "admin", "rasyid.id3@gmail.com"},
-	{gorm.Model{}, "ranggadharma", "admin", "rangga.dharma@hotmail.com"},
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 var DB *gorm.DB
 
 func initDB() {
 	var err error
-	db, err := gorm.Open(mysql.Open("root:admin@localhost:3306/moviein"), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open("root:admin@/moviein?parseTime=true"), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -37,7 +37,78 @@ func main() {
 
 	// Initiate Echo
 	e := echo.New()
-	e.GET("/")
+	e.Pre(middleware.RemoveTrailingSlash())
+
+	// Routing
+	e.POST("/account", AddAccount)
+	e.GET("/account", GetAllAccount)
+	e.PUT("/account/:id", UpdateAccount)
+
+	// Starting the server
+	e.Start(":8585")
 }
 
-// func
+func AddAccount(c echo.Context) error {
+	newAccount := Account{}
+	c.Bind(&newAccount)
+
+	if err := DB.Save(&newAccount).Error; err != nil {
+		return c.JSON(http.StatusNotFound, err)
+	}
+
+	// data = append(data, newAccount)
+	return c.JSON(http.StatusAccepted, map[string]interface{}{
+		"message": "hope all feeling well",
+		"data":    newAccount,
+	})
+}
+
+func GetAllAccount(c echo.Context) error {
+	var accounts []Account
+
+	if err := DB.Find(&accounts).Error; err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+	return c.JSON(http.StatusAccepted, map[string]interface{}{
+		"message": "hope all feeling well",
+		"data":    accounts,
+	})
+}
+
+func UpdateAccount(c echo.Context) error {
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	reqAccount := Account{}
+	c.Bind(&reqAccount)
+
+	// var dataAccount Account
+	// reqAccount.ID = uint(id)
+
+	// DB.Where("id = ?", id).First(&dataAccount)
+
+	// if reqAccount.Username != "" {
+	// 	dataAccount.Username = reqAccount.Username
+	// }
+
+	if err := DB.Where("id = ?", id).Updates(&reqAccount).Error; err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	var dataAccount Account
+	reqAccount.ID = uint(id)
+
+	return c.JSON(http.StatusAccepted, map[string]interface{}{
+		"message": "hope all feeling well",
+		"data":    dataAccount,
+	})
+}
+
+// func getAccount(c echo.Context) error {
+// 	id, _ := strconv.Atoi(c.Param("id"))
+
+// 	if id <= len(data) && id > 0 {
+// 		return c.JSON(http.StatusOK, data[id-1])
+// 	} else {
+// 		return c.JSON(http.StatusOK, data)
+// 	}
+// }
